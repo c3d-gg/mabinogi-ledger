@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Erinn Progress Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: header with server clocks, a "today" strip, then a two-column ledger (checklists | standing), runes, gear, reference. Frost-and-rune-gold palette for the winter Arcana season. */
+:root{
+  --bg:#edf1f4; --surface:#ffffff; --sunk:#f4f7f9; --ink:#16212a; --muted:#566673; --line:#d3dce2;
+  --accent:#0d7584; --accent-soft:#d9eef1; --rune:#9a6a14; --rune-soft:#f5ead2;
+  --good:#2b7a52; --good-soft:#dcf1e4; --warn:#9c6410; --warn-soft:#f8ebd2; --crit:#b42f2f; --crit-soft:#f8dddd;
+  --f-display:"Marcellus","Palatino Linotype",Georgia,serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d141a; --surface:#152029; --sunk:#111a21; --ink:#e3ebf0; --muted:#8c9eab; --line:#253540;
+  --accent:#4dc1cf; --accent-soft:#16343a; --rune:#e2b55c; --rune-soft:#3a2f18;
+  --good:#5cc48b; --good-soft:#163a2a; --warn:#e5ad4b; --warn-soft:#3b2d14; --crit:#f07171; --crit-soft:#3d1c1c;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d141a; --surface:#152029; --sunk:#111a21; --ink:#e3ebf0; --muted:#8c9eab; --line:#253540;
+  --accent:#4dc1cf; --accent-soft:#16343a; --rune:#e2b55c; --rune-soft:#3a2f18;
+  --good:#5cc48b; --good-soft:#163a2a; --warn:#e5ad4b; --warn-soft:#3b2d14; --crit:#f07171; --crit-soft:#3d1c1c;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:30px;letter-spacing:.01em}
+h2{font-size:20px}
+h3{font-size:15px;font-family:var(--f-body);font-weight:600}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+small{font-size:12px}
+
+header.top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end;justify-content:space-between}
+.clocks{display:flex;flex-wrap:wrap;gap:10px}
+.clock{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;min-width:132px}
+.clock .v{font-family:var(--f-mono);font-size:17px;font-variant-numeric:tabular-nums}
+.save{font-size:12px;color:var(--muted)}
+.save b{font-weight:600}
+
+.strip{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;border:1px solid transparent}
+.chip.info{background:var(--accent-soft);color:var(--accent)}
+.chip.rune{background:var(--rune-soft);color:var(--rune)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.crit{background:var(--crit-soft);color:var(--crit)}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.plain{border-color:var(--line);color:var(--muted)}
+
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.progress{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;border:1px solid var(--line)}
+.progress > i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.progress.rune > i{background:var(--rune)}
+
+ul.check{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ul.check li{border-top:1px solid var(--line)}
+ul.check li:first-child{border-top:0}
+ul.check label{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 2px;cursor:pointer}
+ul.check input{width:17px;height:17px;margin:2px 0 0;accent-color:var(--accent);cursor:pointer}
+ul.check .t{font-weight:500}
+ul.check .d{color:var(--muted);font-size:12.5px}
+ul.check li.done .t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.tag{font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;white-space:nowrap;align-self:start;margin-top:1px}
+.tag.event{background:var(--accent-soft);color:var(--accent)}
+.tag.cond{background:var(--rune-soft);color:var(--rune)}
+.tag.opt{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+@media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;font-weight:600;color:var(--muted)}
+.field input,.field select{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%}
+.field input:focus-visible,.field select:focus-visible,button:focus-visible,ul.check input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stat{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--line)}
+.stat:first-of-type{border-top:0}
+.stat .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.stat .big{font-family:var(--f-mono);font-size:15px}
+.note{font-size:12.5px;color:var(--muted)}
+.note.warn{color:var(--warn)} .note.good{color:var(--good)} .note.crit{color:var(--crit)}
+
+.timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.timeline li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.timeline li:first-child{border-top:0}
+.timeline .when{font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.timeline .soon .when{color:var(--warn);font-weight:600}
+.timeline .now .when{color:var(--accent);font-weight:600}
+.timeline .past{opacity:.5}
+
+.syn{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.syn{grid-template-columns:minmax(0,1fr)}}
+.syncard{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--sunk);display:flex;flex-direction:column;gap:8px}
+.runes{display:flex;flex-wrap:wrap;gap:6px}
+.runebtn{font:inherit;font-size:13px;border-radius:8px;padding:5px 10px;border:1px dashed var(--line);background:var(--surface);color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.runebtn.special{border-color:var(--rune)}
+.runebtn.have{border-style:solid;border-color:var(--good);color:var(--ink);background:var(--good-soft)}
+.runebtn .g{font-family:var(--f-display);color:var(--rune)}
+.slots{display:flex;gap:6px;flex-wrap:wrap}
+.slot{width:54px;border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center;font-size:11px;color:var(--muted);background:var(--sunk)}
+.slot b{display:block;font-family:var(--f-display);font-size:16px;font-weight:400;color:var(--muted)}
+.slot.open{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.slot.open b{color:var(--accent)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 12px;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--sunk);font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;white-space:nowrap}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+tr.hl td{background:var(--accent-soft)}
+.pill{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 8px}
+.pill.bis{background:var(--good-soft);color:var(--good)}
+.pill.close{background:var(--warn-soft);color:var(--warn)}
+.pill.far{background:var(--crit-soft);color:var(--crit)}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:20px;text-align:center;color:var(--muted)}
+.empty b{color:var(--ink);font-weight:600}
+.refgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media (max-width:760px){.refgrid{grid-template-columns:minmax(0,1fr)}}
+button.link{font:inherit;font-size:12px;background:none;border:0;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+@media (prefers-reduced-motion:no-preference){.progress > i{transition:width .3s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Mabinogi · Winter 2026 season</div>
+      <h1>Erinn Progress Ledger</h1>
+      <div class="save" id="save">Loading your saved progress…</div>
+    </div>
+    <div class="clocks">
+      <div class="clock"><div class="eyebrow">Server time (PT)</div><div class="v" id="c-now">--:--</div></div>
+      <div class="clock"><div class="eyebrow">Daily reset</div><div class="v" id="c-day">--:--:--</div></div>
+      <div class="clock"><div class="eyebrow">Weekly reset · Thu</div><div class="v" id="c-week">--</div></div>
+    </div>
+  </header>
+  <div class="strip" id="strip"></div>
+  <div class="cols">
+    <div class="stack" id="left"></div>
+    <div class="stack" id="right"></div>
+  </div>
+  <section class="panel" id="runes"></section>
+  <section class="panel" id="gear"></section>
+  <section class="panel" id="ref"></section>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Season data (from the Nov 11 2026 patch notes & event posts) ---------- */
+const DAILY=[
+ {id:"scroll",t:"Claim today's Login Bonus Scroll reward",d:"On your Master Plan main. Scroll #1 has 35 rewards over the 35 days to Dec 17, so a missed day costs the last reward (EXP Selection Box ×5).",tag:["event","Master Plan"]},
+ {id:"pan",t:"Get Pan's attendance stamp",d:"Stay online 15 min, or clear a daily Taillteann/Tara Shadow Mission, Crom Bás, Glenn Bearna, Tech Duinn, or 3 perfect part-time jobs.",tag:["event","Pan"]},
+ {id:"buffs",t:"Pick your 7 Master Plan buffs",d:"Changes once per day. Skip on weekends — every buff is on from Fri to Mon 7 AM.",tag:["event","Master Plan"],weekdayOnly:true},
+ {id:"training",t:"Season of Growth: clear any dungeon 5 times",d:"30,000 EXP, 20 Fever Coins, 10 Shineseeker Orbs. Relog after 7 AM if the quest is missing.",tag:["event","Master Plan"]},
+ {id:"dan",t:"Pass an Advancement Test",d:"Rewards an extra Advancement Test Ticket. Can be done twice a day.",tag:["event","Master Plan"]},
+ {id:"eap",t:"Erinn Adventure Pass: earn today's 280 Adventure EXP",d:"Daily missions reset at 7 AM. Weekends give 1.5×.",tag:["event","Pass"]},
+ {id:"awaken",t:"Arcana Awakening EXP runs",d:"Brí Leith (2,000–2,200), Crom Bás Abyss (2,000), Glenn Bearna (1,500–1,900). These also drop Ogham Rune Boxes.",tag:["cond","After awakening"],needsAwaken:true},
+ {id:"gm",t:"Grandmaster Missions",d:"Bonus Talent Seals on up to 3 clears a day during the Master Plan.",tag:["event","Master Plan"]},
+ {id:"sm",t:"Daily Shadow Mission",d:"Counts for Pan's stamp and the Refined Armor weekly missions.",tag:["opt","Helps others"]},
+ {id:"research",t:"Buy Researcher solo passes if needed",d:"Next to the Poulnabrone. Uladh Adv. Hard 50k, Tech Duinn 100k, Rabbie 120k Gold. Each is limited to 3 a day.",tag:["opt","Optional"]}
+];
+const WEEKLY=[
+ {id:"forge",t:"Fergseus Forge missions for this week",d:"Finishing them unlocks next week's Pass Support Box.",tag:["event","Giveaway"]},
+ {id:"armor",t:"Refined Armor missions for this week",d:"Shineseeker Orbs, Spirit awakening, Erg infusion, daily Shadow Missions.",tag:["event","Giveaway"]},
+ {id:"acc",t:"Forget-me-not Accessory missions for this week",d:"Dan tests, skill use, Society Sponsorship quests.",tag:["event","Giveaway"]},
+ {id:"passbox",t:"Open this week's Pass Support Box",d:"Use the passes for dungeon missions.",tag:["event","Giveaway"]},
+ {id:"fever-raid",t:"Fever Coin shop: raid passes",d:"Brí Leith Pass (30), Glenn Bearna entry (25), Crom Bás entry (20). One of each per week.",tag:["event","Fever Coins"]},
+ {id:"fever-basic",t:"Fever Coin shop: cheap passes and orbs",d:"3× Unrestricted Dungeon Pass, 3× Unlimited Shadow Mission Pass, 10× Shineseeker Orb — 5 coins each.",tag:["event","Fever Coins"]},
+ {id:"dseal",t:"Dungeon Explorer Seal shop",d:"Brí Leith Pass (1,500), Glenn Bearna entry (350), Crom Bás entry ×3 (55). Seals come from Uladh Adv. Hard, Tech Duinn and Rabbie.",tag:["opt","Seals"]},
+ {id:"aseal",t:"Adventurer Seal shop: Unrestricted Dungeon Pass",d:"10 seals, 1 per week.",tag:["opt","Seals"]},
+ {id:"core",t:"Core Shop (Soraia) weekly items",d:"Any Pass Selection Box, Ancient Monster Core, Desecrated Charm Chunk.",tag:["opt","Cores"]}
+];
+const MONTHLY=[
+ {id:"core-m",t:"Core Shop monthly items",d:"Crom Bás Enchant Inheritance box, Purified Apostle Essence, Revelation of the Guardian, Corrupted Apostle Leather ×2, Massive Turtle Chip ×2.",tag:["opt","Cores"]}
+];
+const SETUP=[
+ {id:"efflam",t:"Register your Master Plan main with Efflam",d:"Dunbarton, by the Part-Time Job board. One character per account."},
+ {id:"prep",t:"Finish Season of Growth: Preparation (1)–(3)",d:"Gives the Support Box: Spirit Lv100 scroll, Stardust scrolls, Crusader Lv100 fruit, crest boxes. The box can be banked to another character."},
+ {id:"briogh",t:"Use the Briogh-Infused Potion",d:"Removes the Briogh weekly limit for the whole event."},
+ {id:"synbox",t:"Claim the Ogham Rune Synergy Selection Box",d:"Hot Day reward for the whole season. Pick a synergy for your main Arcana. Expires 60 days after you get it."},
+ {id:"seed",t:"Unlock Arcana Awakening",d:"[Guide] The Seed and the Soil. Needs one Arcana at Level 50 and Link Level 10."},
+ {id:"neartite",t:"Trade leftover Neartite to Soraia",d:"For an Unrestricted Dungeon Pass or a Tech Duinn Party Pass."},
+ {id:"eavan",t:"Register your Erinn Adventure Pass main with Eavan",d:"Dunbarton. Cannot be changed later."},
+ {id:"stamp",t:"Register for Pan's attendance",d:"Boy in Need by the Unicorn Statue, Dunbarton."},
+ {id:"sasha",t:"Rent from Sasha",d:"15×10 Master Plan inventory, two Level 200 Corgis (once per account), event gear."},
+ {id:"pick",t:"Pick your giveaway weapon, armor and accessory types",d:"You can switch until you claim the reward."}
+];
+// Hot Day windows: Fri 7 AM → Mon 7 AM PT (keys are reset-days, inclusive Fri..Sun)
+const HOT=[
+ ["2026-11-13","DIY dye molds, Arcana 2× EXP"],
+ ["2026-11-20","Royal Complete Skill EXP Potion (1 day), Lucky Prism box, Arcana 2× EXP"],
+ ["2026-11-27","Enchant Protection + Extraction Protection Potions, Arcana 2× EXP"],
+ ["2026-12-04","Inventory + Extra Equipment Slot coupons, Arcana 2× EXP"],
+ ["2026-12-11","Spirit Weapon contract + appearance slot coupons, Arcana 2× EXP"],
+ ["2026-12-18","Dogmas of Warding/Binding/Smiting/Bonding, Arcana 2× EXP"],
+ ["2026-12-25","Hair dye ampoule boxes, Arcana 2× EXP"],
+ ["2027-01-01","5× Scorching + 2× Ice-Scorched crest boxes, Arcana 2× EXP"],
+ ["2027-01-08","Rainbow EXP Fruit (Lv200), Special Rainbow Artifact, Arcana 2× EXP"]
+];
+const DEADLINES=[
+ {k:"2026-12-01",t:"Monthly limits reset (Core Shop)"},
+ {k:"2026-12-15",t:"Arcana: New Awakening Part 2 (December, date TBA): a third synergy for every Arcana",tba:true},
+ {k:"2026-12-16",t:"Last day for Pan's attendance stamps and Login Bonus Scroll #1 (both end at Dec 17 maintenance)"},
+ {k:"2027-01-06",t:"Last day to claim leftover Pan rewards from Lorna"},
+ {k:"2027-01-13",t:"Last day of the Master Plan, Erinn Adventure Pass and Login Bonus Scroll #2 (they end at Jan 14 maintenance)"},
+ {k:"2027-01-20",t:"Last week to exchange giveaway rewards with Efflam"}
+];
+const ARCANA={
+ "Elemental Knight":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Dynavolt Smash: Thunderblade",["Beithe","Coll","Cert"]],["Blazing Assault Slash: Full Combustion",["Nin","Ruis","Úr"]]]},
+ "Alchemic Sharpshooter":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Tri-Assault: Concurrence",["Fearn","Idad","Ebhadh"]],["Aqua Volley: Torrent",["Sail","Dair","Edad"]]]},
+ "Sacred Guardian":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Zealous Conviction: Enforcer",["Luis","Tinne","Onn"]],["Rend Armor: Bulwark",["Sail","Gort","Idad"]]]},
+ "Explosive Vanguard":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Drill Charge: Whirlwind",["Nin","Dair","Peithe"]],["Dreadnought Burst: Detonator",["Beithe","Edad","Ebhadh"]]]},
+ "Arsenal Gunner":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Heavy Artillery: Bombardment",["Fearn","Gort","Óir"]],["Detonation: Lock On",["Beithe","Úath","Iphin"]]]},
+ "Melodic Puppeteer":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Cutting Chorus: Crescendo",["Luis","Gétal","Straiph"]],["Downbeat Drop: Ensemble",["Fearn","Muin","Iphin"]]]},
+ "Blazing Brawler":{bonus:"Min/Max Damage, Arcana Skill Bonus Damage",syn:[["Piercing Gale: Charge",["Nin","Ailm","Emancholl"]],["Radiant Storm: Pinnacle",["Fearn","Cert","Uilleand"]]]},
+ "Dark Diviner":{bonus:"Magic Attack Damage",syn:[["Polar Vortex: Hoarfrost",["Beithe","Straiph","Uilleand"]],["Shadow Flare: Purgation",["Luis","Úath","Onn"]]]},
+ "Forbidden Alchemist":{bonus:"All Elemental Alchemic Damage",syn:[["Fangs of Stone: Compression",["Sail","Ailm","Ebhadh"]],["Chemical Carnival: Backdraft",["Luis","Coll","Úr"]]]},
+ "Harmonic Saint":{bonus:"Healing Effect",syn:[["Pulse of Purification: Resonance",["Sail","Óir","Peithe"]],["Resonant Litany: Earsplitter",["Nin","Tinne","Muin"]]]}
+};
+const SPECIAL=new Set(["Beithe","Fearn","Nin","Luis","Sail"]);
+const SLOTS=[1,5,10,15,20];
+const AWK_EXP=[
+ ["Uladh Advanced Hard Mode","50"],["Tech Duinn (Normal)","50"],["Tech Duinn (Hard)","100"],
+ ["Rabbie Phantasm (Normal)","200"],["Rabbie Phantasm (Temptation's Path)","300"],
+ ["Crom Bás / Glenn Bearna (Basic)","1,500",1],["Crom Bás / Glenn Bearna (Normal)","1,700",1],
+ ["Glenn Bearna (Primeval Winter)","1,900",1],["Brí Leith (Normal, all 3 gates)","2,000",1],
+ ["Crom Bás Abyss","2,000",1],["Brí Leith (Abyss of Doubt)","2,200",1]
+];
+const GIVE=[[170,"100 Fever Coins"],[330,"Potions / shoes box"],[540,"100 Fever Coins"],[770,"Inheritance discount ticket / gloves box"],[850,"100 Fever Coins"],[1000,"Final reward"]];
+
+/* ---------- Server-time helpers (server = Pacific, resets at 7 AM) ---------- */
+const TZ="America/Los_Angeles", H=3600e3, D=86400e3;
+const fmt=new Intl.DateTimeFormat("en-US",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",weekday:"short"});
+function pt(ms){const o={};for(const p of fmt.formatToParts(new Date(ms)))o[p.type]=p.value;
+  return {y:+o.year,m:+o.month,d:+o.day,h:+o.hour%24,mi:+o.minute,s:+o.second,wd:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(o.weekday)};}
+const pad=n=>String(n).padStart(2,"0");
+function dayKeyOf(ms){const p=pt(ms-7*H);return `${p.y}-${pad(p.m)}-${pad(p.d)}`;}
+function keyToUTC(k){const [y,m,d]=k.split("-").map(Number);return Date.UTC(y,m-1,d);}
+function addDays(k,n){const t=new Date(keyToUTC(k)+n*D);return `${t.getUTCFullYear()}-${pad(t.getUTCMonth()+1)}-${pad(t.getUTCDate())}`;}
+function daysBetween(a,b){return Math.round((keyToUTC(b)-keyToUTC(a))/D);}
+function wdOfKey(k){return new Date(keyToUTC(k)).getUTCDay();}
+function weekKeyOf(dk){return addDays(dk,-((wdOfKey(dk)-4+7)%7));}
+function monthKeyOf(dk){return dk.slice(0,7);}
+function niceDate(k){return new Date(keyToUTC(k)).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"});}
+function secsSinceReset(ms){const p=pt(ms);return ((p.h-7+24)%24)*3600+p.mi*60+p.s;}
+
+/* ---------- State ---------- */
+const BLANK={v:1,arcana:"",awak:0,pan:0,eap:0,gp:{forge:0,armor:0,acc:0},runes:{},setup:{},daily:{key:"",done:{}},weekly:{key:"",done:{}},monthly:{key:"",done:{}}};
+let S=JSON.parse(JSON.stringify(BLANK));
+const GEAR_DATA=[
+  /* Add one entry per slot, e.g.
+  {order:1, slot:"Weapon", current:"...", bis:"...", next:"...", status:"far"},  // status: bis | close | far
+  */
+];
+let gear=GEAR_DATA.slice(), db=null, ref=null, mode="loading", dirty=false, writing=false, timer=null, loadTimer=null;
+const LS="erinn-ledger-v1";
+function merge(x){const s=JSON.parse(JSON.stringify(BLANK));if(!x||typeof x!=="object")return s;
+  for(const k of Object.keys(s)){if(x[k]!==undefined)s[k]=(typeof s[k]==="object"&&!Array.isArray(s[k]))?Object.assign({},s[k],x[k]):x[k];}return s;}
+function bucket(name,key){if(S[name].key!==key)S[name]={key,done:{}};return S[name].done;}
+function now(){return Date.now();}
+
+function setSave(txt){document.getElementById("save").innerHTML=txt;}
+function queueSave(){dirty=true;clearTimeout(timer);timer=setTimeout(flush,500);setSave("Saving…");}
+async function flush(){
+  if(writing){timer=setTimeout(flush,300);return;}
+  dirty=false;
+  if(mode==="db"&&ref){writing=true;
+    try{await ref.set(JSON.parse(JSON.stringify(S)));setSave("<b>Saved</b> · synced to this page");}
+    catch(e){setSave(e&&e.code==="invalid_argument"?"You can view this page but not save to it.":"Couldn't save just now. Your next change will try again.");}
+    writing=false;
+  }else{try{localStorage.setItem(LS,JSON.stringify(S));setSave("<b>Saved in this browser only</b> · stored on this device");}catch(e){setSave("Not saved: this browser blocks storage.");}}
+}
+
+/* ---------- Rendering ---------- */
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function checklist(group,items,doneMap,ctx){
+  return `<ul class="check">${items.map(it=>{
+    const on=!!doneMap[it.id];
+    let d=it.d, hide=false;
+    if(it.weekdayOnly&&ctx.weekend){d="Weekend: all buffs are already on. Nothing to pick today.";}
+    if(it.needsAwaken&&!(S.awak>0)){d="Unlocks once you finish the Awakening questline. "+it.d;}
+    const tag=it.tag?`<span class="tag ${it.tag[0]}">${esc(it.tag[1])}</span>`:"";
+    return `<li class="${on?"done":""}"><label><input type="checkbox" id="${group}-${it.id}" data-g="${group}" data-id="${it.id}" ${on?"checked":""}><span><span class="t">${esc(it.t)}</span><br><span class="d">${esc(d)}</span></span>${tag}</label></li>`;}).join("")}</ul>`;
+}
+function countDone(items,map,skip){const list=items.filter(i=>!(skip&&skip(i)));return [list.filter(i=>map[i.id]).length,list.length];}
+function hotInfo(dk){
+  for(const [fri,desc] of HOT){const off=daysBetween(fri,dk);if(off>=0&&off<=2)return {active:true,fri,desc};}
+  const nxt=HOT.find(([fri])=>daysBetween(dk,fri)>0);return nxt?{active:false,fri:nxt[0],desc:nxt[1],inDays:daysBetween(dk,nxt[0])}:null;
+}
+
+function render(){
+  const t=now(), dk=dayKeyOf(t), wk=weekKeyOf(dk), mk=monthKeyOf(dk), wd=wdOfKey(dk);
+  const weekend=wd===5||wd===6||wd===0;
+  const dDone=bucket("daily",dk), wDone=bucket("weekly",wk), mDone=bucket("monthly",mk);
+  const ctx={weekend};
+  const skipD=i=>(i.weekdayOnly&&weekend)||(i.needsAwaken&&!(S.awak>0));
+  const [dd,dt]=countDone(DAILY,dDone,skipD), [wdn,wt]=countDone(WEEKLY,wDone), [sd,st]=countDone(SETUP,S.setup);
+  const hot=hotInfo(dk);
+
+  /* strip */
+  const chips=[];
+  chips.push(weekend?`<span class="chip good">Weekend: all 7+ Master Plan buffs active</span>`:`<span class="chip plain">Weekday: pick 7 buffs</span>`);
+  if(hot){chips.push(hot.active?`<span class="chip rune">Hot Day now: ${esc(hot.desc)}</span>`:`<span class="chip info">Next Hot Day ${hot.inDays===1?"tomorrow":"in "+hot.inDays+" days"} (${niceDate(hot.fri)})</span>`);}
+  const nextDl=DEADLINES.find(x=>daysBetween(dk,x.k)>=0&&!x.tba);
+  if(nextDl){const n=daysBetween(dk,nextDl.k);chips.push(`<span class="chip ${n<=7?"warn":"plain"}">${n===0?"Today":n+" days"}: ${esc(nextDl.t.split("(")[0].trim())}</span>`);}
+  if(sd<st)chips.push(`<span class="chip crit">${st-sd} season setup step${st-sd>1?"s":""} not done</span>`);
+  document.getElementById("strip").innerHTML=chips.join("");
+
+  /* left: checklists */
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  let L=`<section class="panel"><div class="panel-head"><h2>Today</h2><span class="mono muted">${dd}/${dt} · resets 7 AM PT</span></div>
+    <div class="progress"><i style="width:${pct(dd,dt)}%"></i></div>${checklist("daily",DAILY,dDone,ctx)}</section>`;
+  L+=`<section class="panel"><div class="panel-head"><h2>This week</h2><span class="mono muted">${wdn}/${wt} · week of ${niceDate(wk)}</span></div>
+    <div class="progress"><i style="width:${pct(wdn,wt)}%"></i></div>${checklist("weekly",WEEKLY,wDone,ctx)}</section>`;
+  L+=`<section class="panel"><div class="panel-head"><h2>This month</h2><span class="mono muted">resets on the 1st</span></div>${checklist("monthly",MONTHLY,mDone,ctx)}</section>`;
+  L+=`<section class="panel"><div class="panel-head"><h2>Season setup</h2><span class="mono muted">${sd}/${st} · one time</span></div>
+    <div class="progress rune"><i style="width:${pct(sd,st)}%"></i></div>${checklist("setup",SETUP,S.setup,ctx)}</section>`;
+  document.getElementById("left").innerHTML=L;
+
+  /* right: standing */
+  const panLeftDays=Math.max(0,daysBetween(dk,"2026-12-16")+1);
+  const panNeed=Math.max(0,84-S.pan);
+  const panTodayDone=!!dDone.pan;
+  const panAvail=panLeftDays-(panTodayDone?1:0);
+  let panNote;
+  if(panNeed===0)panNote=`<span class="note good">All 84 stamps done. Claim the Day 84 box.</span>`;
+  else if(panNeed<=panAvail)panNote=`<span class="note good">On track: ${panNeed} stamps left, ${panAvail} days left to earn them${panAvail-panNeed>0?` (${panAvail-panNeed} spare)`:" — no spare days"}.</span>`;
+  else panNote=`<span class="note warn">${panNeed} stamps left but only ${panAvail} days. Buy ${panNeed-panAvail} Attendance Pass${panNeed-panAvail>1?"es":""} (250,000 Gold each, up to 4 a week).</span>`;
+  const eapDays=Math.max(0,daysBetween(dk,"2027-01-13")+1);
+  const awk=S.awak, nextSlot=SLOTS.find(l=>l>awk);
+  const giveRow=(key,label)=>{const v=S.gp[key]||0;const nx=GIVE.find(g=>g[0]>v);
+    return `<div class="stat"><div class="row"><span>${label}</span><span class="big">${v}/1000</span></div><div class="progress"><i style="width:${Math.min(100,v/10)}%"></i></div>
+    <span class="note">${nx?`Next at ${nx[0]}: ${esc(nx[1])} (${nx[0]-v} pts)`:"Reward unlocked. Claim it with Efflam."}</span></div>`;};
+  let R=`<section class="panel"><div class="panel-head"><h2>Where I'm at</h2><span class="muted"><small>Edit the numbers as you play</small></span></div>
+   <div class="fields">
+    <div class="field"><label for="f-arcana">Main Arcana</label><select id="f-arcana" data-f="arcana"><option value="">Choose…</option>${Object.keys(ARCANA).map(a=>`<option ${S.arcana===a?"selected":""}>${a}</option>`).join("")}</select></div>
+    <div class="field"><label for="f-awak">Awakening level (0 = locked)</label><input id="f-awak" data-f="awak" type="number" min="0" max="30" value="${S.awak}"></div>
+    <div class="field"><label for="f-pan">Pan stamps collected</label><input id="f-pan" data-f="pan" type="number" min="0" max="84" value="${S.pan}"></div>
+    <div class="field"><label for="f-eap">Adventure Pass level</label><input id="f-eap" data-f="eap" type="number" min="0" max="50" value="${S.eap}"></div>
+    <div class="field"><label for="f-gp-forge">Fergseus Forge points</label><input id="f-gp-forge" data-f="gp.forge" type="number" min="0" max="1000" value="${S.gp.forge}"></div>
+    <div class="field"><label for="f-gp-armor">Refined Armor points</label><input id="f-gp-armor" data-f="gp.armor" type="number" min="0" max="1000" value="${S.gp.armor}"></div>
+    <div class="field"><label for="f-gp-acc">Forget-me-not points</label><input id="f-gp-acc" data-f="gp.acc" type="number" min="0" max="1000" value="${S.gp.acc}"></div>
+   </div>
+   <div style="margin-top:12px">
+    <div class="stat"><div class="row"><span>Arcana Awakening</span><span class="big">${awk}/30</span></div><div class="progress rune"><i style="width:${awk/30*100}%"></i></div>
+     <span class="note ${awk?"":"warn"}">${awk?(nextSlot?`${SLOTS.filter(l=>l<=awk).length} of 5 rune slots open. Slot ${SLOTS.indexOf(nextSlot)+1} opens at level ${nextSlot}.`:"All 5 rune slots open. Extra EXP is now stored for other Arcanas."):"Not unlocked yet. Get an Arcana to Level 50 and Link 10, then do [Guide] The Seed and the Soil."}</span></div>
+    <div class="stat"><div class="row"><span>Pan's attendance</span><span class="big">${S.pan}/84</span></div><div class="progress"><i style="width:${S.pan/84*100}%"></i></div>${panNote}</div>
+    <div class="stat"><div class="row"><span>Erinn Adventure Pass</span><span class="big">${S.eap}/50</span></div><div class="progress"><i style="width:${S.eap/50*100}%"></i></div>
+     <span class="note">${S.eap>=50?"Maxed: the Conqueror title is yours.":`${eapDays} days left. Up to 280 EXP a day, 1.5× on weekends.`}</span></div>
+    ${giveRow("forge","Fergseus Forge (weapon)")}${giveRow("armor","Refined Armor")}${giveRow("acc","Forget-me-not Accessory")}
+   </div></section>`;
+  R+=`<section class="panel"><div class="panel-head"><h2>Dates to watch</h2><span class="muted"><small>Server time</small></span></div><ul class="timeline">`;
+  const tl=[...HOT.map(([fri,desc])=>({k:fri,end:addDays(fri,3),t:"Hot Day: "+desc,hot:1})),...DEADLINES].sort((a,b)=>a.k<b.k?-1:1);
+  for(const x of tl){const n=daysBetween(dk,x.k);const active=x.hot&&n<=0&&n>=-2;const past=x.hot?n<-2:n<0;
+    if(past&&!active&&n<-3)continue;
+    const cls=active?"now":past?"past":n<=7?"soon":"";
+    const when=x.tba?"Dec (TBA)":x.hot?`${niceDate(x.k)}–${niceDate(x.end).replace(/^\w+ /,"")}`:niceDate(x.k);
+    R+=`<li class="${cls}"><span class="when">${when}</span><span>${active?"<b>Now · </b>":""}${esc(x.t)}</span></li>`;}
+  R+=`</ul></section>`;
+  document.getElementById("right").innerHTML=R;
+
+  /* runes */
+  const A=ARCANA[S.arcana];
+  let RU=`<div class="panel-head"><h2>Ogham Runes${S.arcana?" · "+esc(S.arcana):""}</h2><span class="muted"><small>Tap a rune when you own it</small></span></div>`;
+  if(!A){RU+=`<div class="empty"><b>Choose your main Arcana</b> in "Where I'm at" to see its two rune synergies and which runes you still need.</div>`;}
+  else{
+    RU+=`<p class="note" style="margin:0 0 12px">Awakening bonus: <b>${esc(A.bonus)}</b>. Each synergy needs all 3 runes equipped, and higher grades make it stronger. The Hot Day selection box gives one full set: 1 Masterwork special rune and 2 Fine runes.</p><div class="syn">`;
+    for(const [name,set] of A.syn){const have=set.filter(r=>S.runes[r]).length;
+      RU+=`<div class="syncard"><div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><h3>${esc(name)}</h3><span class="mono ${have===3?"note good":"muted"}">${have}/3</span></div>
+      <div class="runes">${set.map(r=>`<button class="runebtn ${SPECIAL.has(r)?"special":""} ${S.runes[r]?"have":""}" data-rune="${esc(r)}" aria-pressed="${!!S.runes[r]}"><span class="g">ᚑ</span>${esc(r)}${SPECIAL.has(r)?" <small>(special)</small>":""}</button>`).join("")}</div>
+      <span class="note">${have===3?"Set complete. Upgrade the Fine runes next: 5 Fine runes with the same name make 1 Exquisite of that name (20,000 Gold).":"Special runes only drop from Masterwork boxes (Brí Leith and Abyss content drop them most)."}</span></div>`;}
+    RU+=`</div><div style="margin-top:14px"><div class="eyebrow" style="margin-bottom:6px">Rune slots</div><div class="slots">${SLOTS.map((l,i)=>`<div class="slot ${awk>=l?"open":""}"><b>${i+1}</b>Lv ${l}</div>`).join("")}</div></div>`;
+  }
+  document.getElementById("runes").innerHTML=RU;
+
+  /* gear */
+  let G=`<div class="panel-head"><h2>Gear vs best-in-slot</h2><span class="muted"><small>${gear.length?gear.filter(g=>g.status==="bis").length+"/"+gear.length+" slots at BIS":"Waiting for your gear list"}</small></span></div>`;
+  if(!gear.length){G+=`<div class="empty"><b>No gear added yet.</b><br>Fill in the GEAR_DATA list near the top of the script in index.html. Each slot will show here with what you have now, the BIS target, and your next upgrade.</div>`;}
+  else{G+=`<div class="tablewrap"><table><thead><tr><th>Slot</th><th>Current</th><th>BIS target</th><th>Next step</th><th>Status</th></tr></thead><tbody>${gear.map(g=>`<tr><td><b>${esc(g.slot||"")}</b></td><td>${esc(g.current||"")}</td><td>${esc(g.bis||"")}</td><td>${esc(g.next||"")}</td><td><span class="pill ${esc(g.status||"far")}">${g.status==="bis"?"At BIS":g.status==="close"?"Close":"Far"}</span></td></tr>`).join("")}</tbody></table></div>`;}
+  document.getElementById("gear").innerHTML=G;
+
+  /* reference */
+  document.getElementById("ref").innerHTML=`<div class="panel-head"><h2>Quick reference</h2><span class="muted"><small>From the Nov 11 update notes</small></span></div>
+   <div class="refgrid">
+    <div><h3 style="margin-bottom:8px">Awakening EXP per clear</h3><div class="tablewrap"><table><thead><tr><th>Dungeon</th><th style="text-align:right">EXP</th></tr></thead><tbody>
+     ${AWK_EXP.map(r=>`<tr class="${r[2]?"hl":""}"><td>${esc(r[0])}${r[2]?' <small class="muted">· drops rune boxes</small>':""}</td><td class="num">${r[1]}</td></tr>`).join("")}</tbody></table></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+     <div><h3 style="margin-bottom:8px">Rerolling rune lines</h3><div class="tablewrap"><table><thead><tr><th>Lines locked</th><th>Cost</th></tr></thead><tbody>
+      <tr><td>0</td><td>5,000 Gold + 1 Ogham Fragment</td></tr><tr><td>1</td><td>10,000 Gold + 3 Fragments + 1 Smoldering Thread</td></tr><tr><td>2</td><td>20,000 Gold + 5 Fragments + 1 Smoldering + 1 Frostflame Thread</td></tr></tbody></table></div></div>
+     <div><h3 style="margin-bottom:8px">Combine and break down</h3><div class="tablewrap"><table><thead><tr><th>Action</th><th>Result</th></tr></thead><tbody>
+      <tr><td>5 Fine → Exquisite</td><td>20,000 Gold. Same name in, same name out.</td></tr><tr><td>5 Exquisite → Masterwork</td><td>100,000 Gold</td></tr>
+      <tr><td>Break down a rune</td><td>Fine 5 · Exquisite 15 · Masterwork 45 Fragments</td></tr></tbody></table></div></div>
+    </div>
+   </div>`;
+  tick();
+}
+
+function tick(){
+  const t=now(), p=pt(t);
+  document.getElementById("c-now").textContent=`${pad(p.h)}:${pad(p.mi)}`;
+  const left=86400-secsSinceReset(t);
+  document.getElementById("c-day").textContent=`${pad(Math.floor(left/3600))}:${pad(Math.floor(left%3600/60))}:${pad(left%60)}`;
+  const dk=dayKeyOf(t), since=(wdOfKey(dk)-4+7)%7, wl=(6-since)*86400+left;
+  document.getElementById("c-week").textContent=`${Math.floor(wl/86400)}d ${Math.floor(wl%86400/3600)}h`;
+  if(dk!==tick.lastKey){if(tick.lastKey)render();tick.lastKey=dk;}
+}
+
+/* ---------- Events ---------- */
+document.getElementById("app").addEventListener("change",e=>{
+  const el=e.target;
+  if(el.matches("input[type=checkbox][data-g]")){const g=el.dataset.g,id=el.dataset.id;
+    const map=g==="setup"?S.setup:S[g].done; if(el.checked)map[id]=true; else delete map[id]; render(); queueSave(); return;}
+  if(el.dataset.f){const f=el.dataset.f;let v=el.type==="number"?Math.max(+el.min||0,Math.min(+el.max||9999,Math.round(+el.value||0))):el.value;
+    if(f.startsWith("gp."))S.gp[f.slice(3)]=v;else S[f]=v; const id=el.id; render(); queueSave(); const n=document.getElementById(id); if(n&&el.tagName==="SELECT")n.focus();}
+});
+document.getElementById("app").addEventListener("click",e=>{
+  const b=e.target.closest("[data-rune]"); if(!b)return; const r=b.dataset.rune;
+  if(S.runes[r])delete S.runes[r]; else S.runes[r]=true; render(); queueSave();
+  const n=document.querySelector(`[data-rune="${CSS.escape(r)}"]`); if(n)n.focus();
+});
+
+/* ---------- Boot ---------- */
+try{const raw=localStorage.getItem(LS);if(raw)S=merge(JSON.parse(raw));}catch(e){}
+render();
+setInterval(tick,1000);
+(async()=>{
+  db=window.claude&&window.claude.use?await window.claude.use("db").catch(()=>null):null;
+  if(!db){mode="local";setSave("<b>Saving in this browser only</b> · stored on this device");return;}
+  mode="db"; ref=db.doc("tracker/state");
+  loadTimer=setTimeout(()=>setSave("Can't reach your saved progress yet. Changes will sync when it connects."),10000);
+  ref.onSnapshot(snap=>{
+    if(!snap.metadata.fromCache){clearTimeout(loadTimer);}
+    if(dirty||writing||snap.metadata.hasPendingWrites)return;
+    if(snap.exists){S=merge(snap.data());setSave("<b>Synced</b> · changes save automatically");}
+    else if(!snap.metadata.fromCache){setSave("<b>Ready</b> · tick things off and they'll save here");}
+    render();
+  },err=>{clearTimeout(loadTimer);setSave("Saved progress is unavailable right now. Ticks won't be kept this visit.");});
+  db.collection("gear").orderBy("order").onSnapshot(snap=>{gear=snap.docs.map(d=>d.data());render();},()=>{});
+})();
+})();
+</script>
+
+</body>
+</html>
